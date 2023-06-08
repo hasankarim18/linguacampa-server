@@ -56,6 +56,18 @@ async function run() {
         }
     })
 
+    /**
+     * instructor
+     */
+
+    app.get('/instructor', async (req, res)=> {
+        try {
+          res.send({ message: "ok", data: "instructors" });
+        } catch (error) {
+          res.send({ message: "failed", data: "data failed" });
+        }
+    } )
+
 
 
     // Send a ping to confirm a successful connection
