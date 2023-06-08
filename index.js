@@ -48,6 +48,9 @@ async function run() {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
 
+      const database = client.db("linguaCampa");
+      const instructorCollection = database.collection("instructors");
+
     app.get('/classes', async (req,res)=> {
         try {
             res.send({message:'ok', data: 'classes'})
@@ -62,7 +65,10 @@ async function run() {
 
     app.get('/instructor', async (req, res)=> {
         try {
-          res.send({ message: "ok", data: "instructors" });
+            const cursor = instructorCollection.find()
+            const result = await cursor.toArray()
+          
+          res.send({ message: "ok", data: result });
         } catch (error) {
           res.send({ message: "failed", data: "data failed" });
         }
@@ -77,7 +83,7 @@ async function run() {
     );
   } finally {
     // Ensures that the client will close when you finish/error
-    await client.close();
+  //  await client.close();
   }
 }
 run().catch(console.dir);
