@@ -5,7 +5,7 @@
 ### [Lingua campa live link](https://linguacampa.web.app/)
 
 
-### [vercel api hitpoint](https://linguacampa-hd6essp06-hasankarim18.vercel.app/)
+### [vercel api hitpoint](https://linguacampa.vercel.app/)
 
 #### [LinguaCampa Clientside github link](https://github.com/programming-hero-web-course1/b712-summer-camp-client-side-hasankarim18)
 
