@@ -16,7 +16,7 @@ const app = express()
 
 // middlewares 
 app.use(cors())
-app.use(express())
+app.use(express.json());
 
 
 const port = process.env.PORT || 5000
@@ -48,33 +48,48 @@ async function run() {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
 
-      const database = client.db("linguaCampa");
-      const instructorCollection = database.collection("instructors");
+    const database = client.db("linguaCampa");
+    const instructorCollection = database.collection("instructors");
+    const usersCollections = database.collection("users");
 
-    app.get('/classes', async (req,res)=> {
-        try {
-            res.send({message:'ok', data: 'classes'})
-        } catch (error) {
-            res.send({message:'failed', data:'data failed'})
-        }
-    })
+    app.get("/classes", async (req, res) => {
+      try {
+        res.send({ message: "ok", data: "classes" });
+      } catch (error) {
+        res.send({ message: "failed", data: "data failed" });
+      }
+    });
 
     /**
      * instructor
      */
 
-    app.get('/instructor', async (req, res)=> {
-        try {
-            const cursor = instructorCollection.find()
-            const result = await cursor.toArray()
-          
-          res.send({ message: "ok", data: result });
-        } catch (error) {
-          res.send({ message: "failed", data: "data failed" });
-        }
-    } )
+    app.get("/instructor", async (req, res) => {
+      try {
+        const cursor = instructorCollection.find();
+        const result = await cursor.toArray();
 
+        res.send({ message: "ok", data: result });
+      } catch (error) {
+        res.send({ message: "failed", data: "data failed" });
+      }
+    });
+    /** save all signed up user data */
+    app.post("/users", async (req, res) => {
+      const user = req.body;
+     const userEmail = user.email;
+    
+     const query = { email: userEmail };
 
+     const existingUser = await usersCollections.findOne(query);
+
+     if (existingUser) { 
+       return res.send({ message: "user already exists" });
+     } else {
+       const result = await usersCollections.insertOne(user);
+       res.send(result);
+     }
+    });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
