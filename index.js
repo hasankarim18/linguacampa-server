@@ -74,6 +74,7 @@ async function run() {
     const database = client.db("linguaCampa");
     const instructorCollection = database.collection("instructors");
     const usersCollections = database.collection("users");
+    const classesCollections = database.collection("classes");
 
     /**
      * ***********************************************************
@@ -109,11 +110,28 @@ async function run() {
      *   *  WHEN A USER LOGGED IN IT VERIFIES ITS ROLE AND GIVE ROLE RETURN
      * **********************************************************
      *  */
+    
+    /**
+     * ************************************************
+     *  VERIFY INSTRUCTOR WITH VALID JWT
+     */
+    const verifyInstructor = async (req, res, next)=> {
+      const email = req.decoded.email;
+        const query = { email: email };
+        const user = await usersCollections.findOne(query);
+
+         if (user?.role !== "instructor") {
+           return res
+             .status(403)
+             .send({ error: true, message: "forbidden message", data: [] });
+         }
+         next();
+    }
+
     app.get("/users/role/:email", verifyJWT, async (req, res) => {
       const decodedEmail = req.decoded.email;
 
-      const email = req.params.email;
-     
+      const email = req.params.email;    
 
       if (decodedEmail !== email) {
         return res.status(401).send({ admin: false });
@@ -182,8 +200,20 @@ async function run() {
     });
 
     /**
-     * instructor
+     * instructor only add a class
      */
+
+    app.post('/classes', verifyJWT, verifyInstructor, async (req, res)=> {
+      try {
+         const data = req.body;
+         data.status = "pending";       
+          const result = await classesCollections.insertOne(data);
+         res.send({ message: "success",data:result });
+      } catch (error) {
+        res.send({message:'error', data: error})
+      }
+     
+    })
 
     app.get("/instructor", async (req, res) => {
       try {
