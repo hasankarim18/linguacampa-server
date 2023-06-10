@@ -77,6 +77,7 @@ async function run() {
     /** save all signed up user data */
     app.post("/users", async (req, res) => {
       const user = req.body;
+      user.role = "student";
      const userEmail = user.email;
     
      const query = { email: userEmail };
