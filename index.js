@@ -76,6 +76,7 @@ async function run() {
     const usersCollections = database.collection("users");
     const classesCollections = database.collection("classes");
     const feedbackCollections = database.collection("feedback");
+    const selectedCollections = database.collection("selected");
 
     /**
      * ***********************************************************
@@ -93,46 +94,133 @@ async function run() {
      *     WARNING use veriryJWT before useing verifyAdmin
      * **********************************************************
      *  */
-      const verifyAdmin = async (req, res, next) => {
-        const email = req.decoded.email;
-        const query = { email: email };
-        const user = await usersCollections.findOne(query);
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded.email;
+      const query = { email: email };
+      const user = await usersCollections.findOne(query);
 
-        if (user?.role !== "admin") {
-          return res
-            .status(403)
-            .send({ error: true, message: "forbidden message", data: [] });
-        }
-        next();
-      };
+      if (user?.role !== "admin") {
+        return res
+          .status(403)
+          .send({ error: true, message: "forbidden message", data: [] });
+      }
+      next();
+    };
 
     /**
      * ***********************************************************
      *   *  WHEN A USER LOGGED IN IT VERIFIES ITS ROLE AND GIVE ROLE RETURN
      * **********************************************************
      *  */
-    
+
     /**
      * ************************************************
      *  VERIFY INSTRUCTOR WITH VALID JWT
      */
-    const verifyInstructor = async (req, res, next)=> {
+    const verifyInstructor = async (req, res, next) => {
       const email = req.decoded.email;
-        const query = { email: email };
-        const user = await usersCollections.findOne(query);
+      const query = { email: email };
+      const user = await usersCollections.findOne(query);
 
-         if (user?.role !== "instructor") {
-           return res
-             .status(403)
-             .send({ error: true, message: "forbidden message", data: [] });
-         }
-         next();
-    }
+      if (user?.role !== "instructor") {
+        return res
+          .status(403)
+          .send({ error: true, message: "forbidden message", data: [] });
+      }
+      next();
+    };
+
+    /**
+     * ************************************************
+     *  VERIFY STUDENT WITH VALID JWT
+     */
+    const verifyStudent = async (req, res, next) => {
+      const email = req.decoded.email;
+      const query = { email: email };
+      const user = await usersCollections.findOne(query);
+
+      if (user?.role !== "student") {
+        return res
+          .status(403)
+          .send({ error: true, message: "forbidden message", data: [] });
+      }
+      next();
+    };
+
+    /***Student related apis */
+    app.post('/selectClass',verifyJWT, verifyStudent,  async (req, res)=> {
+      try {
+        const body = req.body 
+        const classId = body.classId
+        const studentEmail = body.studenEmail;
+        const date = new Date()        
+         const doc = {
+          classId,
+          studentEmail,
+          date
+         };
+         const result = await selectedCollections.insertOne(doc);
+        res.send({message:"success"})
+      } catch (error) {
+        res.send({message:'error'})
+      }
+    } )
+
+    /** #deleteSelect class */
+
+    app.delete('/deleteSelectedClass', verifyJWT, verifyStudent, async (req, res)=> {
+      try {
+          const classId = req.query.classId;
+          const stEmail = req.query.email 
+          console.log(classId, stEmail);
+
+          const query = {
+            $and: [
+              { classId: classId },
+              {
+                studentEmail: stEmail,
+              },
+            ],
+          };
+         const result = await selectedCollections.deleteOne(query);
+          
+          res.send({message:'success', data:result})
+      } catch (error) {
+        res.send({ message: "error" });
+      }
+    })
+
+    /** #student selected class */
+    app.get("/studentSelectedClass/:email", verifyJWT, verifyStudent, async (req, res)=> {
+      try {
+        stEmail = req.params.email 
+        const query = {
+          studentEmail:stEmail 
+        };
+
+        const cursor = selectedCollections.find(query)
+
+        const result = await cursor.toArray()
+     //   console.log(result)
+
+        const classIds =  result.map(item => item.classId)
+
+      //  console.log(classIds)
+
+         const query2 = { _id: { $in: classIds.map((id) => new ObjectId(id)) } };
+
+         const result2 = await classesCollections.find(query2).toArray();
+
+        res.send({message:"success", data: result2})
+      } catch (error) {
+         res.send({ message: "error" });
+      }
+    } );
 
     app.get("/users/role/:email", verifyJWT, async (req, res) => {
       const decodedEmail = req.decoded.email;
 
-      const email = req.params.email;    
+      const email = req.params.email;
 
       if (decodedEmail !== email) {
         return res.status(401).send({ admin: false });
@@ -141,56 +229,57 @@ async function run() {
       const query = { email: email };
 
       const user = await usersCollections.findOne(query);
-      const result = user?.role 
-     // const result = { role: user?.role };
+      const result = user?.role;
+      // const result = { role: user?.role };
       res.send(result);
     });
 
     /**
-     * Admin Only Get all user data 
+     * Admin Only Get all user data
      */
-    
-    app.get('/users', verifyJWT, verifyAdmin, async (req, res)=> {
+
+    app.get("/users", verifyJWT, verifyAdmin, async (req, res) => {
       try {
-        const cursor = usersCollections.find()
-        const result = await cursor.toArray()
-        res.send({message:'success', data:result})
+        const cursor = usersCollections.find();
+        const result = await cursor.toArray();
+        res.send({ message: "success", data: result });
       } catch (error) {
-         res.send({ message: "error", data: error });
+        res.send({ message: "error", data: error });
       }
-    } )
+    });
 
     /**
-     * Admin only update role 
+     * Admin only update role
      */
 
-    app.patch('/users', verifyJWT, verifyAdmin ,async (req, res)=> {
+    app.patch("/users", verifyJWT, verifyAdmin, async (req, res) => {
       try {
-         const query = req.query;
-       //  console.log(query);
-         const email = query.email
-         const role = query.role
+        const query = req.query;
+        //  console.log(query);
+        const email = query.email;
+        const role = query.role;
 
         const filter = { email: email };
-        
+
         const options = { upsert: true };
-       // create a document that sets the plot of the movie
+        // create a document that sets the plot of the movie
         const updateDoc = {
           $set: {
             role: role,
             applied: false,
-          }         
+          },
         };
-        const result = await usersCollections.updateOne(filter, updateDoc, options);
+        const result = await usersCollections.updateOne(
+          filter,
+          updateDoc,
+          options
+        );
 
-
-         res.send({ message: "success", data: result });
+        res.send({ message: "success", data: result });
       } catch (error) {
-         res.send({ message: "error" });
+        res.send({ message: "error" });
       }
-     
-    } )
-
+    });
 
     app.get("/classes", async (req, res) => {
       try {
@@ -204,88 +293,170 @@ async function run() {
      * instructor only add a class
      */
 
-    app.post('/classes', verifyJWT, verifyInstructor, async (req, res)=> {
+    app.post("/classes", verifyJWT, verifyInstructor, async (req, res) => {
       try {
-         const data = req.body;
-         data.status = "pending";       
-          const result = await classesCollections.insertOne(data);
-         res.send({ message: "success",data:result });
+        const data = req.body;
+        data.status = "pending";
+        const result = await classesCollections.insertOne(data);
+        res.send({ message: "success", data: result });
       } catch (error) {
-        res.send({message:'error', data: error})
-      }     
-    })
+        res.send({ message: "error", data: error });
+      }
+    });
 
     /** #allclassses admin only getting all classes */
 
-    app.get("/allclasses/:email", verifyJWT, verifyAdmin, async (req, res)=> {
+    app.get("/allclasses/:email", verifyJWT, verifyAdmin, async (req, res) => {
       try {
-        const adminEmail = req.params.email 
-       // console.log(adminEmail);
-        const cursor = classesCollections.find()
-        const result = await cursor.toArray()
-        res.send({message:'success', data:result})
+        const adminEmail = req.params.email;
+        // console.log(adminEmail);
+        const cursor = classesCollections.find();
+        const result = await cursor.toArray();
+        res.send({ message: "success", data: result });
       } catch (error) {
-        res.send({message:'error'})
+        res.send({ message: "error" });
       }
-    } );
+    });
+
+    /** #all approved classes public url */
+
+    app.get("/allClasses", async (req, res) => {
+      try {
+        const query = { status: "approved" };
+        const cursor = classesCollections.find(query);
+        const result = await cursor.toArray();
+        res.send({ message: "success", data: result });
+      } catch (error) {
+        res.send({ message: "error" });
+      }
+    });
 
     /** #status admin only classes status change */
-    app.post("/classes/status", verifyJWT, verifyAdmin, async (req, res)=> {
+    app.post("/classes/status", verifyJWT, verifyAdmin, async (req, res) => {
       try {
-        const info = req.body 
-        const classId = info.classId 
-        const status = info.status
-       
+        const info = req.body;
+        const classId = info.classId;
+        const status = info.status;
+
         const filter = { _id: new ObjectId(classId) };
-         const updateDoc = {
-           $set: {
-             status:status
-           },
-         };
+        const updateDoc = {
+          $set: {
+            status: status,
+          },
+        };
         const options = { upsert: true };
         const result = await classesCollections.updateOne(
           filter,
           updateDoc,
           options
         );
-        res.send({message:"success" , data:result})
+        res.send({ message: "success", data: result });
       } catch (error) {
-        res.send({message:'error'})
+        res.send({ message: "error" });
       }
-    } );
+    });
 
     /** #feedback post feed back to instructor */
 
-    app.post('/instructor/feedback', verifyJWT, verifyAdmin, async (req, res)=> {
-      try {
-        const feedback = req.body 
-        const classId = req.query.classId 
-        const instructorEmail = req.query.email
-        const doc = {classId, instructorEmail, feedback}
-        const result = await feedbackCollections.insertOne(doc)
-        res.send({message:'success', data:result})
-      } catch (error) {
-        res.send({message:'error'})
+    app.post(
+      "/instructor/feedback",
+      verifyJWT,
+      verifyAdmin,
+      async (req, res) => {
+        try {
+          const body = req.body;
+          const classId = req.body.classId;
+          const instructorEmail = req.body.instructorEmail;
+          const feedback = req.body.feedback;
+          const doc = { classId, instructorEmail, feedback };
+          const result = await feedbackCollections.insertOne(doc);
+          res.send({ message: "success", data: result });
+        } catch (error) {
+          res.send({ message: "error" });
+        }
       }
-    })
+    );
+
+    //  app.get(
+    //    "/instructors/feedback/:email",
+    //    verifyJWT,
+    //    verifyInstructor,
+    //    async (req, res) => {
+    //      try {
+    //         const email = req.params.email
+    //          const query = { instructorEmail:email  };
+    //          const cursor = feedbackCollections.find(query)
+    //          const result = await cursor.toArray()
+    //          console.log(result);
+    //        res.send({ message: "success", data:result });
+    //      } catch (error) {
+    //        res.send({ message: "error" });
+    //      }
+    //    }
+    //  );
+
+    app.get(
+      "/instructors/feedback/:email",
+      verifyJWT,
+      verifyInstructor,
+      async (req, res) => {
+        try {
+          const email = req.params.email;
+          const query = { instructorEmail: email };
+          const cursor = feedbackCollections.find(query);
+          const feedbackResults = await cursor.toArray();
+
+          // Fetch class information based on class ID and combine with feedback results
+          const classIds = feedbackResults.map(
+            (feedback) => new ObjectId(feedback.classId)
+          );
+
+          const classQuery = { _id: { $in: classIds } };
+          const classCursor = classesCollections.find(classQuery);
+          const classResults = await classCursor.toArray();
+          //  console.log('cls',classResults)
+
+          // Create a mapping of class ID to class information
+          const classMap = classResults.reduce((map, clazz) => {
+            map[clazz._id.toString()] = clazz;
+            return map;
+          }, {});
+
+          // Combine class information with feedback results
+          const combinedResults = feedbackResults.map((feedback) => {
+            const classInfo = classMap[feedback.classId.toString()];
+            return {
+              ...feedback,
+              classInfo: classInfo ? classInfo : null,
+            };
+          });
+
+          // console.log('conbine ',combinedResults);
+          res.send({ message: "success", data: combinedResults });
+        } catch (error) {
+          console.error(error);
+          res.send({ message: "error" });
+        }
+      }
+    );
 
     /**
      * instructor only view class only own his class
      */
 
-    app.get('/classes/:email', async (req, res)=> {
+    app.get("/classes/:email", async (req, res) => {
       try {
-        const email = req.params.email      
-         const query = { instructorEmail:email };
-         const cursor = classesCollections.find(query)
-         const result = await cursor.toArray()
-        res.send({message:"success", data: result})
+        const email = req.params.email;
+        const query = { instructorEmail: email };
+        const cursor = classesCollections.find(query);
+        const result = await cursor.toArray();
+        res.send({ message: "success", data: result });
       } catch (error) {
-        res.send({message:"error"})
+        res.send({ message: "error" });
       }
-    } )
+    });
 
-    app.get("/instructor",verifyJWT, verifyInstructor, async (req, res) => {
+    app.get("/instructor", verifyJWT, verifyInstructor, async (req, res) => {
       try {
         const cursor = instructorCollection.find();
         const result = await cursor.toArray();
