@@ -338,6 +338,8 @@ async function run() {
     app.post("/classes", verifyJWT, verifyInstructor, async (req, res) => {
       try {
         const data = req.body;
+        data.enrolledStudents = 0;
+        
         data.status = "pending";
         const result = await classesCollections.insertOne(data);
         res.send({ message: "success", data: result });
@@ -345,6 +347,35 @@ async function run() {
         res.send({ message: "error", data: error });
       }
     });
+
+    app.patch(
+      "/updateInsturctor/:email",
+      verifyJWT,
+      verifyInstructor,
+      async (req, res) => {
+        try {
+          const body = req.body;   
+          const email = req.params.email   
+          const name = body.name 
+          const photo = body.photo 
+          const phone = body.phone
+          const filter = { email: email };
+           const options = { upsert: true };
+           const updateDoc = {
+             $set: {
+               photo: photo,
+               phone:phone,
+               name:name
+             },
+           };
+           const result = await usersCollections.updateOne(filter, updateDoc, options);
+
+          res.send({ message: "success", data:result });
+        } catch (error) {
+          res.send({ message: "error" });
+        }
+      }
+    );
 
     /** #allclassses admin only getting all classes */
 
@@ -496,11 +527,15 @@ async function run() {
       verifyJWT,
       verifyInstructor,
       async (req, res) => {
-        const email = req.params.email;
-        console.log(email);
+        try {
+            const email = req.params.email;          
 
-        const result = await usersCollections.findOne({ email: email });
-        res.send(result);
+            const result = await usersCollections.findOne({ email: email });
+            res.send({message:"success", data:result});
+        } catch (error) {
+          res.send({message:'error', data:[]})
+        }
+      
       }
     );
 
@@ -643,7 +678,7 @@ async function run() {
 
           if (isEnrolled) {
             const eid = isEnrolled.enrolledClassIds;
-
+            console.log('enrolled')
             const enrolledClasses = await classesCollections
               .find({ _id: { $in: eid.map((item) => new ObjectId(item)) } })
               .toArray();
@@ -653,7 +688,7 @@ async function run() {
             res.send({ message: "not_enrolled", data: [] });
           }
         } catch (error) {
-          res.send({ message: "errror" });
+          res.send({ message: "errror", data: [] });
         }
       }
     );
