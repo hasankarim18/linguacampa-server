@@ -83,6 +83,8 @@ async function run() {
     const classesCollections = database.collection("classes");
     const feedbackCollections = database.collection("feedback");
     const selectedCollections = database.collection("selected");
+    const paymentsCollections = database.collection("payments");
+    const enrollCollections = database.collection('enrolled')
 
     /**
      * ***********************************************************
@@ -154,31 +156,58 @@ async function run() {
     };
 
     /***Student related apis */
-    app.post('/selectClass',verifyJWT, verifyStudent,  async (req, res)=> {
+    app.post("/selectClass", verifyJWT, verifyStudent, async (req, res) => {
       try {
-        const body = req.body 
-        const classId = body.classId
+
+        const body = req.body;
+        const classId = body.classId;
         const studentEmail = body.studenEmail;
-        const date = new Date()        
-         const doc = {
-          classId,
-          studentEmail,
-          date
-         };
-         const result = await selectedCollections.insertOne(doc);
-        res.send({message:"success"})
+
+        const isExistsQuery = {
+          studentEmail: studentEmail,
+          classId:classId
+        };
+
+        const isEnrolled = await enrollCollections.findOne({
+          studentId: studentEmail,
+          enrolledClassIds: { $in: [classId] },
+        });
+        const isExists = await selectedCollections.findOne(isExistsQuery)
+
+        console.log(isEnrolled)
+       
+
+        if(isExists){
+          return res.send({message:"already_selected"})
+        }else {
+          if(isEnrolled){
+             return res.send({ message: "already_enrolled" });
+          }else {
+            const date = new Date();
+            const doc = {
+              classId,
+              studentEmail,
+              date,
+            };
+            const result = await selectedCollections.insertOne(doc);
+            res.send({ message: "success" });
+          }           
+        }       
       } catch (error) {
-        res.send({message:'error'})
+        res.send({ message: "error" });
       }
-    } )
+    });
 
     /** #deleteSelect class */
 
-    app.delete('/deleteSelectedClass', verifyJWT, verifyStudent, async (req, res)=> {
-      try {
+    app.delete(
+      "/deleteSelectedClass",
+      verifyJWT,
+      verifyStudent,
+      async (req, res) => {
+        try {
           const classId = req.query.classId;
-          const stEmail = req.query.email 
-         
+          const stEmail = req.query.email;
 
           const query = {
             $and: [
@@ -188,37 +217,49 @@ async function run() {
               },
             ],
           };
-         const result = await selectedCollections.deleteOne(query);
-          
-          res.send({message:'success', data:result})
-      } catch (error) {
-        res.send({ message: "error" });
+          const result = await selectedCollections.deleteOne(query);
+
+          res.send({ message: "success", data: result });
+        } catch (error) {
+          res.send({ message: "error" });
+        }
       }
-    })
+    );
 
     /** #student selected class */
-    app.get("/studentSelectedClass/:email", verifyJWT, verifyStudent, async (req, res)=> {
-      try {
-        stEmail = req.params.email 
-        const query = {
-          studentEmail:stEmail 
-        };
+    app.get(
+      "/studentSelectedClass/:email",
+      verifyJWT,
+      verifyStudent,
+      async (req, res) => {
+        try {
+          stEmail = req.params.email;
+          const query = {
+            studentEmail: stEmail,
+          };
 
-        const cursor = selectedCollections.find(query)
+          const cursor = selectedCollections.find(query);
 
-        const result = await cursor.toArray()    
+          const result = await cursor.toArray();
 
-        const classIds =  result.map(item => item.classId)   
+    //    const obId = result.map(item => item._id)
 
-         const query2 = { _id: { $in: classIds.map((id) => new ObjectId(id)) } };
+          const classIds = result.map((item) => item.classId);
 
-         const result2 = await classesCollections.find(query2).toArray();
+          const query2 = {
+            _id: { $in: classIds.map((id) => new ObjectId(id)) },
+          };
 
-        res.send({message:"success", data: result2})
-      } catch (error) {
-         res.send({ message: "error" });
+          const result2 = await classesCollections.find(query2).toArray();
+         // result2.selectedItemObjectId = obId;
+        //  console.log('[result2]',result2) 
+
+          res.send({ message: "success", data: result2  });
+        } catch (error) {
+          res.send({ message: "error" });
+        }
       }
-    } );
+    );
 
     app.get("/users/role/:email", verifyJWT, async (req, res) => {
       const decodedEmail = req.decoded.email;
@@ -487,26 +528,108 @@ async function run() {
       }
     });
 
-    /*** #create payment intent */ 
+    /*** #create payment intent */
 
-    app.post('/create-payment-intent',verifyJWT,  async (req, res)=> {
-      const {price} = req.body 
-      const amount = price*100; 
+    app.post("/create-payment-intent", verifyJWT, async (req, res) => {
+      const { price } = req.body;
+      const amount = price * 100;    
 
-      console.log(amount);
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: "usd",
+        payment_method_types: ["card"],
+      });
 
-        const paymentIntent = await stripe.paymentIntents.create({
-          amount: amount,
-          currency: "usd",
-          payment_method_types: ["card"],
-          
-        });
+      res.send({
+        clientSecret: paymentIntent.client_secret,
+      });
+    });
 
-        res.send({
-          clientSecret: paymentIntent.client_secret,
-        });
+    /**#paymentsCollections #paymentHistory */
+    app.post('/payments',verifyJWT,verifyStudent,  async (req, res)=> {
+      const payment = req.body     
+      const insertResult = await paymentsCollections.insertOne(payment)
 
+
+      const query = {
+        studentEmail: payment.user
+      };
+
+        const deleteResult = await selectedCollections.deleteMany(query)
+
+
+       const existingStudent = await enrollCollections.findOne({studentId:payment.user});
+
+     
+         
+       if(existingStudent){
+      //  console.log('user Exists',existingStudent);
+          const updatedEnrolledClassIds = [
+            ...existingStudent.enrolledClassIds,
+            ...payment.enrolledClassIds,
+          ];
+
+          const updateResult = await enrollCollections.updateOne(
+            { studentId: payment.user },
+            { $set: { enrolledClassIds: updatedEnrolledClassIds } }
+          );
+
+          if (updateResult.modifiedCount > 0) {
+            // The enrolledClassIds array has been updated successfully
+            res.send({ insertResult, deleteResult, updateResult });
+          } else {
+            // Failed to update the enrolledClassIds array
+            res.status(500).send("Failed to update enrolledClassIds array.");
+          }
+
+       }else {
+           const enrolled = payment.enrolledClassIds;
+           const studentEmail = payment.user;
+          const enrolldoc = {
+             enrolledClassIds: enrolled,
+             studentId: studentEmail,
+             date: new Date(),
+           };      
+         // console.log('user not exist');
+
+           const enrolledResult = await enrollCollections.insertOne(enrolldoc);
+           res.send({ insertResult, deleteResult, enrolledResult });
+       }     
+   
     } )
+
+      app.get("/updateSeats", async (req, res) => {
+        try {
+          const enrolledStudents = await enrollCollections.find().toArray();
+          const classes = await classesCollections
+            .find({ status: "approved" })
+            .toArray();
+
+          for (const classObj of classes) {
+            const classId = classObj._id;
+            const enrolledCount = enrolledStudents.filter((student) =>
+              student.enrolledClassIds.includes(classId)
+            ).length;
+            const seatsLeft = classObj.seats - enrolledCount;
+
+            console.log(enrolledCount);
+
+            // await classesCollections.updateOne(
+            //   { _id: classId },
+            //   { $set: { enrolledStudents: enrolledCount, seatsLeft: seatsLeft } }
+            // );
+          }
+
+          res.send("Seats updated successfully");
+        } catch (error) {
+          console.error(error);
+          res.status(500).send("Error updating seats");
+        }
+      });
+
+
+
+
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
