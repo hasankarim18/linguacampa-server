@@ -475,6 +475,23 @@ async function run() {
             };
           });
 
+          /**************
+           * 
+           * instructor home 
+           */
+
+          app.get(
+            "/instructorHome/:email",
+            verifyJWT,
+            verifyInstructor,
+            async (req, res) => {
+              const email = req.params.email;
+            
+              const result = await usersCollections.findOne({ email: email });
+              res.send(result);
+            }
+          );
+
           // console.log('conbine ',combinedResults);
           res.send({ message: "success", data: combinedResults });
         } catch (error) {
@@ -557,10 +574,7 @@ async function run() {
 
         const deleteResult = await selectedCollections.deleteMany(query)
 
-
-       const existingStudent = await enrollCollections.findOne({studentId:payment.user});
-
-     
+       const existingStudent = await enrollCollections.findOne({studentId:payment.user});    
          
        if(existingStudent){
       //  console.log('user Exists',existingStudent);
@@ -597,6 +611,45 @@ async function run() {
        }     
    
     } )
+
+    /** student payment history */
+
+    app.get('/paymentHistory/:email', verifyJWT, verifyStudent, async (req, res)=> {
+      const email = req.params.email
+
+      const payments = await paymentsCollections
+        .find({user:email})
+        .sort({ date: -1 })
+        .toArray();
+
+        res.send({message:"success",data:payments})
+
+    } )
+
+    /** enrolled classes */
+
+    app.get('/enrolledClasses/:email', verifyJWT, verifyStudent, async (req, res)=> {
+      try {
+        const email = req.params.email 
+        const isEnrolled = await enrollCollections.findOne({ studentId :email});
+
+        if(isEnrolled){
+          const eid = isEnrolled.enrolledClassIds
+
+          const enrolledClasses = await classesCollections
+            .find({ _id: { $in: eid.map(item => new ObjectId(item)) } })
+            .toArray();
+
+            res.send({ message: "success", data: enrolledClasses });
+        }else {
+           res.send({ message: "not_enrolled", data: []});
+        }
+
+      
+      } catch (error) {
+        res.send({message:"errror"})
+      }
+    })
 
       app.get("/updateSeats", async (req, res) => {
         try {
