@@ -174,7 +174,7 @@ async function run() {
         });
         const isExists = await selectedCollections.findOne(isExistsQuery);
 
-        console.log(isEnrolled);
+     
 
         if (isExists) {
           return res.send({ message: "already_selected" });
@@ -251,7 +251,7 @@ async function run() {
 
           const result2 = await classesCollections.find(query2).toArray();
           // result2.selectedItemObjectId = obId;
-          //  console.log('[result2]',result2)
+        
 
           res.send({ message: "success", data: result2 });
         } catch (error) {
@@ -298,7 +298,7 @@ async function run() {
     app.patch("/users", verifyJWT, verifyAdmin, async (req, res) => {
       try {
         const query = req.query;
-        //  console.log(query);
+       
         const email = query.email;
         const role = query.role;
 
@@ -383,7 +383,7 @@ async function run() {
     app.get("/allclasses/:email", verifyJWT, verifyAdmin, async (req, res) => {
       try {
         const adminEmail = req.params.email;
-        // console.log(adminEmail);
+       
         const cursor = classesCollections.find();
         const result = await cursor.toArray();
         res.send({ message: "success", data: result });
@@ -451,23 +451,7 @@ async function run() {
       }
     );
 
-    //  app.get(
-    //    "/instructors/feedback/:email",
-    //    verifyJWT,
-    //    verifyInstructor,
-    //    async (req, res) => {
-    //      try {
-    //         const email = req.params.email
-    //          const query = { instructorEmail:email  };
-    //          const cursor = feedbackCollections.find(query)
-    //          const result = await cursor.toArray()
-    //          console.log(result);
-    //        res.send({ message: "success", data:result });
-    //      } catch (error) {
-    //        res.send({ message: "error" });
-    //      }
-    //    }
-    //  );
+   
 
     app.get(
       "/instructors/feedback/:email",
@@ -488,7 +472,7 @@ async function run() {
           const classQuery = { _id: { $in: classIds } };
           const classCursor = classesCollections.find(classQuery);
           const classResults = await classCursor.toArray();
-          //  console.log('cls',classResults)
+         
 
           // Create a mapping of class ID to class information
           const classMap = classResults.reduce((map, clazz) => {
@@ -505,7 +489,7 @@ async function run() {
             };
           });
 
-          // console.log('conbine ',combinedResults);
+         
           res.send({ message: "success", data: combinedResults });
         } catch (error) {
           console.error(error);
@@ -613,7 +597,7 @@ async function run() {
       });
 
       if (existingStudent) {
-        //  console.log('user Exists',existingStudent);
+       
         const updatedEnrolledClassIds = [
           ...existingStudent.enrolledClassIds,
           ...payment.enrolledClassIds,
@@ -639,7 +623,7 @@ async function run() {
           studentId: studentEmail,
           date: new Date(),
         };
-        // console.log('user not exist');
+       
 
         const enrolledResult = await enrollCollections.insertOne(enrolldoc);
         res.send({ insertResult, deleteResult, enrolledResult });
@@ -679,7 +663,7 @@ async function run() {
 
           if (isEnrolled) {
             const eid = isEnrolled.enrolledClassIds;
-            console.log('enrolled')
+        
             const enrolledClasses = await classesCollections
               .find({ _id: { $in: eid.map((item) => new ObjectId(item)) } })
               .toArray();
@@ -708,7 +692,7 @@ async function run() {
           ).length;
           const seatsLeft = classObj.seats - enrolledCount;
 
-          console.log(enrolledCount);
+        
 
           // await classesCollections.updateOne(
           //   { _id: classId },
@@ -802,6 +786,38 @@ async function run() {
       }
        
     })
+
+    /** update Class seats */
+
+    app.post('/updateClassSeats',verifyJWT, verifyStudent, async (req, res)=> {
+        try {
+            const body = req.body
+         
+              cid = body.map(id => new ObjectId(id))
+        // const classes = await classesCollections
+          //   .find({ _id: { $in: body.map((id) => new ObjectId(id)) } })
+          //  .toArray();
+            
+          //  for (const cls of classes) {
+          //    const updatedEnrolledStudents = cls.enrolledStudents + 1;
+          //    await classesCollections.updateOne(
+          //      { _id: cls._id },
+          //      { $set: { enrolledStudents: updatedEnrolledStudents } }
+          //    );
+          //  }
+            
+        const result = await classesCollections.updateMany(
+          { _id: { $in: cid } },
+          { $inc: { enrolledStudents: 1 } }
+        );
+
+      
+          res.send({message:"success", data:result})
+        } catch (error) {
+            res.send({ message: "error" });
+        }
+
+    } )
 
 
 
