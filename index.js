@@ -75,7 +75,8 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+   // await client.connect();
+     client.connect();
 
     const database = client.db("linguaCampa");
     const instructorCollection = database.collection("instructors");
@@ -721,6 +722,63 @@ async function run() {
         res.status(500).send("Error updating seats");
       }
     });
+
+    /***** API OPEN TO ALL */
+
+    app.get('/popularClasses', async (req, res)=> {
+      try {
+        const result = await classesCollections
+          .find()
+          .sort({ enrolledStudents: -1 })
+          .limit(6).toArray()
+        res.send({message:"success", data:result})
+      } catch (error) {
+        res.send({message:'error', data:[]})
+      }
+    } )
+    /** #popular */
+    app.get('/popularInstructors', async (req, res)=> {
+      try {  
+        const query = {role:'instructor'}
+       const instructList = await usersCollections.find(query).toArray();
+       //const 
+       const classes = await classesCollections.find().toArray()
+        const instructorEmails = instructList.map(
+          (instructor) => instructor.email
+        );
+
+        const combinedArray = instructorEmails.map((email) => {
+          return {
+            email: email,
+            classList: classes.filter((cls) => cls.instructorEmail === email),
+          };
+        });
+
+        const enrolledStudentsArray = combinedArray.map((instructor) => {
+          const totalEnrolledStudents = instructor.classList.reduce(
+            (sum, cls) => sum + cls.enrolledStudents,
+            0
+          );
+          return {
+            email: instructor.email,
+            totalEnrolledStudents: totalEnrolledStudents,
+          };
+        });
+
+        const sortedEnrolledStudentsArray = enrolledStudentsArray.sort(
+          (a, b) => b.totalEnrolledStudents - a.totalEnrolledStudents
+        );
+
+     res.send({ message: "success", data: sortedEnrolledStudentsArray });
+
+      } catch (error) {
+        res.send({message:"error"})
+      }
+       
+
+    })
+
+
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
