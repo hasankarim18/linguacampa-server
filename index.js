@@ -744,7 +744,9 @@ async function run() {
        //const 
        const classes = await classesCollections.find().toArray()
         const instructorEmails = instructList.map(
-          (instructor) => instructor.email
+          (instructor) => { 
+            return instructor.email
+            }
         );
 
         const combinedArray = instructorEmails.map((email) => {
@@ -754,7 +756,7 @@ async function run() {
           };
         });
 
-        const enrolledStudentsArray = combinedArray.map((instructor) => {
+        const popularInsArray = combinedArray.map((instructor) => {
           const totalEnrolledStudents = instructor.classList.reduce(
             (sum, cls) => sum + cls.enrolledStudents,
             0
@@ -765,17 +767,40 @@ async function run() {
           };
         });
 
-        const sortedEnrolledStudentsArray = enrolledStudentsArray.sort(
+        const sortedInstructorArray = popularInsArray.sort(
           (a, b) => b.totalEnrolledStudents - a.totalEnrolledStudents
         );
 
-     res.send({ message: "success", data: sortedEnrolledStudentsArray });
+    const updatedInstructors = [];
+
+      // Iterate over sortedEnrolledStudentsArray using for...of loop
+      for (const instructor of sortedInstructorArray) {
+        const user = await usersCollections.findOne({
+          email: instructor.email,
+        });
+
+        if (user) {
+          // Create a new object with the combined information from enrollment and user
+          const updatedEnrollment = {
+            email: instructor.email,
+            totalEnrolledStudents: instructor.totalEnrolledStudents,
+            info: user,
+          };
+
+          updatedInstructors.push(updatedEnrollment);
+        }
+      }
+
+     res.send({
+       message: "success",
+       data: updatedInstructors,
+       com: combinedArray,
+     });
 
       } catch (error) {
         res.send({message:"error"})
       }
        
-
     })
 
 
