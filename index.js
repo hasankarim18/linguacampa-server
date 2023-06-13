@@ -794,17 +794,7 @@ async function run() {
             const body = req.body
          
               cid = body.map(id => new ObjectId(id))
-        // const classes = await classesCollections
-          //   .find({ _id: { $in: body.map((id) => new ObjectId(id)) } })
-          //  .toArray();
-            
-          //  for (const cls of classes) {
-          //    const updatedEnrolledStudents = cls.enrolledStudents + 1;
-          //    await classesCollections.updateOne(
-          //      { _id: cls._id },
-          //      { $set: { enrolledStudents: updatedEnrolledStudents } }
-          //    );
-          //  }
+        
             
         const result = await classesCollections.updateMany(
           { _id: { $in: cid } },
